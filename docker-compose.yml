@@ -7,7 +7,7 @@ services:
     image: bodypix
     restart: always
     ports:
-      - 9000:9000
+      - 9091:9091
     command: node /src/app.js
   fakecam:
     build:
@@ -21,12 +21,12 @@ services:
     environment:
       ACTUAL_CAMERA: "/dev/video0"
       FAKE_CAMERA: "/dev/video20"
-      CAMERA_WIDTH: "640"
-      CAMERA_HEIGHT: "360"
-      #CAMERA_WIDTH: "1280"
-      #CAMERA_HEIGHT: "720"
+      #CAMERA_WIDTH: "640"
+      #CAMERA_HEIGHT: "360"
+      CAMERA_WIDTH: "1280"
+      CAMERA_HEIGHT: "720"
       CAMERA_FPS: "24"
-      BODYPIX_URL: http://bodypix:9000
+      BODYPIX_URL: http://bodypix:9091
     volumes:
         - ./data:/data
     devices:

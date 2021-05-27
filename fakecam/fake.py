@@ -6,7 +6,7 @@ import pyfakewebcam
 import traceback
 import time
 
-def get_mask(frame, bodypix_url=os.environ.get("BODYPIX_URL","http://bodypix:9000")):
+def get_mask(frame, bodypix_url=os.environ.get("BODYPIX_URL","http://bodypix:9091")):
     _, data = cv2.imencode(".jpg", frame)
     r = requests.post(
         url=bodypix_url,
@@ -49,6 +49,45 @@ def hologram_effect(img):
     out = cv2.addWeighted(img, 0.5, holo_blur, 0.6, 0)
     return out
 
+def blur_img(img):
+    blur = cv2.GaussianBlur(img,(55,55),0)
+    return blur
+
+def apply_background(frame, mask, background):
+    inv_mask = 1-mask
+    for c in range(frame.shape[2]):
+        frame[:,:,c] = frame[:,:,c]*mask + background[:,:,c]*inv_mask
+
+def cut(frame, mask):
+    inv_mask = 1-mask
+    return crop(frame, inv_mask)
+
+def crop(frame, mask):
+    res = frame.copy()
+    for c in range(res.shape[2]):
+        res[:,:,c] = res[:,:,c]*mask
+    return res
+
+def blur_background(frame, mask):
+    blured = blur_img(frame)
+    mask = crop(blured, mask)
+    res = blend_with_mask_matrix(frame, blured, mask)
+    return res
+
+def blend_with_mask_matrix(src1, src2, mask):
+    res_channels = []
+    for c in range(0, src1.shape[2]):
+        a = src1[:, :, c]
+        b = src2[:, :, c]
+        m = mask[:, :, c]
+        res = cv2.add(
+            cv2.multiply(b, cv2.divide(np.full_like(m, 255) - m, 255.0, dtype=cv2.CV_32F), dtype=cv2.CV_32F),
+            cv2.multiply(a, cv2.divide(m, 255.0, dtype=cv2.CV_32F), dtype=cv2.CV_32F),
+           dtype=cv2.CV_8U)
+        res_channels += [res]
+    res = cv2.merge(res_channels)
+    return res
+
 def get_frame(cap, background_scaled, speed=True):
     _, frame = cap.read()
     # fetch the mask with retries (the app needs to warmup and we're lazy)
@@ -71,12 +110,10 @@ def get_frame(cap, background_scaled, speed=True):
     
     # post-process mask and frame
     mask = post_process_mask(mask)
-    #frame = hologram_effect(frame)
 
-    # composite the foreground and background
-    inv_mask = 1-mask
-    for c in range(frame.shape[2]):
-       frame[:,:,c] = frame[:,:,c]*mask + background_scaled[:,:,c]*inv_mask
+    #frame = hologram_effect(frame)
+    # apply_background(frame, mask, background_scaled)
+    frame = blur_background(frame, mask)
 
 
     return frame
